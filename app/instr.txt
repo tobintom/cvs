@@ -1,0 +1,6 @@
+$ENV:PATH += ";C:\Users\tobin\AppData\Local\Android\Sdk\platform-tools"
+
+alias -> cvs
+tobintom123
+X:\EclipseWorkspace\cvs\app\key
+X:\EclipseWorkspace\cvs\app\build\outputs\apk\debug
