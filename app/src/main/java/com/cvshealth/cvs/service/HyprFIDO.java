@@ -16,7 +16,7 @@ import okhttp3.Response;
 public class HyprFIDO {
 
     private static MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-    private static String URL_BASE = "https://cvshealthdev.hypr.com";
+    private static String URL_BASE = "https://cvshealthdemo.gethypr.com";
 
     public static String getRegistrationChallenge(String userName)throws Exception{
         OkHttpClient client = Service.getServiceClient().newBuilder()
@@ -113,12 +113,12 @@ public class HyprFIDO {
         return response.body().string();
     }
 
-    public static String getUserPasskeys(SharedPreferences sp, Context c)throws Exception{
+    public static String getUserPasskeys(String username)throws Exception{
         OkHttpClient client = Service.getServiceClient().newBuilder()
                 .authenticator(new Authenticator())
                 .build();
         //Build URL
-        HttpUrl.Builder urlBuilder = HttpUrl.parse("").newBuilder();
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(URL_BASE + "/rp/api/versioned/fido2/user?username="+username).newBuilder();
         Request request = new Request.Builder()
                 .url(urlBuilder.build().toString())
                 .build();
@@ -127,14 +127,15 @@ public class HyprFIDO {
         return response.body().string();
     }
 
-    public static String deleteUserPasskey(SharedPreferences sp, Context c)throws Exception{
+    public static String deleteUserPasskey(String username, String keyid)throws Exception{
         OkHttpClient client = Service.getServiceClient().newBuilder()
                 .authenticator(new Authenticator())
                 .build();
         //Build URL
-        HttpUrl.Builder urlBuilder = HttpUrl.parse("").newBuilder();
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(URL_BASE + "/rp/api/versioned/fido2/user?username="+username+"&keyId="+keyid).newBuilder();
         Request request = new Request.Builder()
                 .url(urlBuilder.build().toString())
+                .delete()
                 .build();
         Response response = client.newCall(request).execute();
 

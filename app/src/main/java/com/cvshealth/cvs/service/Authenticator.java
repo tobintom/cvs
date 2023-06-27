@@ -11,7 +11,7 @@ import okhttp3.Route;
 
 public class Authenticator implements okhttp3.Authenticator{
 
-    private final String token = "hypap-756f693d-3162-43d9-811e-11f36a957117";
+    private final String token = "hypap-1d715d15-aa7e-421e-9580-12003020256e";
 
     @Nullable
     @Override

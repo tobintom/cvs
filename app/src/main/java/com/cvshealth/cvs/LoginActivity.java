@@ -140,22 +140,12 @@ public class LoginActivity extends AppCompatActivity {
                     System.out.println("FINAL PAYLOAD " +jsobObj.toString());
                     //Start Authentication
                     CredentialManager credentialManager = CredentialManager.create(LoginActivity.this);
-                    JSONObject clientData = new JSONObject();
-                    clientData.put("type","webauthn.get");
-                    clientData.put("challenge",jsobObj.getString("challenge"));
-                    clientData.put("origin","https://thedigitalword.org");
-
-                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                    byte[] encodedhash = digest.digest(
-                            clientData.toString().getBytes(StandardCharsets.UTF_8));
-                    String clientDataHash = Util.bytesToHex(encodedhash);
 
                     GetPublicKeyCredentialOption getPublicKeyCredentialOption =
-                            new GetPublicKeyCredentialOption(jsobObj.toString(),clientDataHash,true);
+                            new GetPublicKeyCredentialOption(jsobObj.toString());
 
                     GetCredentialRequest getCredRequest = new GetCredentialRequest.Builder()
                             .addCredentialOption(getPublicKeyCredentialOption)
-                            .setOrigin("https://thedigitalword.org")
                             .build();
                     //Perform Platform Authentication
                     credentialManager.getCredentialAsync(
@@ -202,19 +192,19 @@ public class LoginActivity extends AppCompatActivity {
                         System.out.println("RESPONSE" + payload);
                         JSONObject jsobObj = new JSONObject(payload);
 
-                        JSONObject jchild = jsobObj.getJSONObject("response");
-                        String clientData = jchild.getString("clientDataJSON");
-                        //MANIPULATE THE CLIENTJSONDATA. HYPR DOES NOT UNDERSTAND ANDROID
-                        String sd = new String(Base64.getUrlDecoder().decode(clientData));
-                        System.out.println(sd);
-                        JSONObject clientJ = new JSONObject(sd);
-                        //clientJ.remove("androidPackageName");
-                        clientJ.put("origin","https://thedigitalword.org");
-                        String newclient = clientJ.toString();
-                        System.out.println("clientDataJSON "+newclient);
-                        String p = Util.getBase64URLEncodedString(newclient);
-                        jchild.put("clientDataJSON", p);
-                        System.out.println("clientDataJSON "+p);
+//                        JSONObject jchild = jsobObj.getJSONObject("response");
+//                        String clientData = jchild.getString("clientDataJSON");
+//                        //MANIPULATE THE CLIENTJSONDATA. HYPR DOES NOT UNDERSTAND ANDROID
+//                        String sd = new String(Base64.getUrlDecoder().decode(clientData));
+//                        System.out.println(sd);
+//                        JSONObject clientJ = new JSONObject(sd);
+//                        clientJ.remove("androidPackageName");
+//                        clientJ.put("origin","https://thedigitalword.org");
+//                        String newclient = clientJ.toString();
+//                        System.out.println("clientDataJSON "+newclient);
+//                        String p = Util.getBase64URLEncodedString(newclient);
+//                        jchild.put("clientDataJSON", p);
+//                        System.out.println("clientDataJSON "+p);
 
 //                        String authenticatorData = jchild.getString("authenticatorData");
 //                        jchild.put("authenticatorData",new String(Base64.getUrlEncoder().encode(authenticatorData.getBytes())));
@@ -223,7 +213,7 @@ public class LoginActivity extends AppCompatActivity {
 //                        String userHandle = jchild.getString("userHandle");
 //                        jchild.put("userHandle",new String(Base64.getUrlEncoder().encode(userHandle.getBytes())));
 
-                        jsobObj.put("response",jchild);
+                      //  jsobObj.put("response",jchild);
 
                         System.out.println("FINAL PAYLOAD : " +jsobObj.toString());
                         //FIDO API CALL
@@ -250,10 +240,15 @@ public class LoginActivity extends AppCompatActivity {
 
     public void handleSuccessfulLogin(JSONObject obj){
         SharedPreferences.Editor editor = sharedpreferences.edit();
-        editor.putString(MainActivity.user, "user");
+        String user = "";
+        try {
+            user = obj.getString("username");
+        }catch (Exception e1) {//Handle error separately
+        }
+        editor.putString(MainActivity.user, user);
         editor.commit();
         in = new Intent(LoginActivity.this,MainActivity.class);
-        in.putExtra("login","standard");
+        in.putExtra("login","passkey");
         startActivity(in);
     }
 

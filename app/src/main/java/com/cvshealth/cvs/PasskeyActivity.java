@@ -6,20 +6,19 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 
-import com.cvshealth.cvs.service.HyprFIDO;
-import com.cvshealth.cvs.util.Util;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.cardview.widget.CardView;
 import androidx.credentials.CreateCredentialResponse;
 import androidx.credentials.CreatePublicKeyCredentialRequest;
-import androidx.credentials.CreatePublicKeyCredentialResponse;
 import androidx.credentials.CredentialManager;
 import androidx.credentials.CredentialManagerCallback;
 import androidx.credentials.exceptions.CreateCredentialCancellationException;
@@ -29,28 +28,23 @@ import androidx.credentials.exceptions.CreateCredentialProviderConfigurationExce
 import androidx.credentials.exceptions.CreateCredentialUnknownException;
 import androidx.credentials.exceptions.CreateCustomCredentialException;
 import androidx.credentials.exceptions.publickeycredential.CreatePublicKeyCredentialDomException;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import android.view.LayoutInflater;
-import android.view.View;
-
-import android.view.Menu;
-import android.view.MenuItem;
-import android.widget.Button;
+import com.cvshealth.cvs.model.Passkey;
+import com.cvshealth.cvs.service.HyprFIDO;
+import com.google.android.gms.fido.Fido;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Base64;
+import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 
-import kotlin.coroutines.Continuation;
-import kotlin.coroutines.CoroutineContext;
-
-public class MainActivity extends AppCompatActivity {
+public class PasskeyActivity extends AppCompatActivity {
 
     public static final String PREFERENCES = "CVSPref" ;
     public static final String user = "nameKey";
@@ -60,81 +54,96 @@ public class MainActivity extends AppCompatActivity {
     private MaterialAlertDialogBuilder materialDialogBuilder;
     private View customAlertView;
     private ProgressDialog ringProgressDialog;
+    ArrayList<Passkey> list = new ArrayList();
+    PasskeyAdapter adapter = new PasskeyAdapter(this, list);
+    RecyclerView passkeys = null;
+    TextView vt = null;
+    Button passkey = null;
+    String username = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        sharedpreferences = getSharedPreferences(MainActivity.PREFERENCES, Context.MODE_PRIVATE);
-        String userName = sharedpreferences.getString(MainActivity.user,null);
-        Toolbar toolbar = findViewById(R.id.toolbarx);
-        materialDialogBuilder = new MaterialAlertDialogBuilder(this);
-        toolbar.setTitle("Account");
-        setSupportActionBar(toolbar);
-        BottomNavigationView mBottomNavigationView=(BottomNavigationView)findViewById(R.id.bottomNavigationView);
-        mBottomNavigationView.getMenu().findItem(R.id.account).setChecked(true);
-        Button mButton2 = findViewById(R.id.so);
-        CardView secView = findViewById(R.id.security);
-
-        //Manage Passkeys
-        secView.setOnClickListener(v->{
-            startActivity(new Intent(this, PasskeyActivity.class));
-        });
-
-        Button signin = findViewById(R.id.signin);
-        //Check for signout button
-        if(userName!=null && userName.trim().length()>0){
-            mButton2.setVisibility(View.VISIBLE);
-            secView.setVisibility(View.VISIBLE);
-            signin.setVisibility(View.GONE);
-        }else{
-            mButton2.setVisibility(View.GONE);
-            secView.setVisibility(View.GONE);
-            signin.setVisibility(View.VISIBLE);
-        }
-
-        mButton2.setOnClickListener(v -> {
-            SharedPreferences.Editor editor = sharedpreferences.edit();
-            editor.remove(MainActivity.user);
-            editor.commit();
-            startActivity(new Intent(this,MainActivity.class));
-        });
-
-
-        signin.setOnClickListener(v -> {
-            startActivity(new Intent(this, LoginActivity.class));
-        });
-
-        String loginMethod = this.getIntent().getStringExtra("login");
-
-        HashSet pwee = (HashSet) sharedpreferences.getStringSet(pwe,new HashSet<String>());
-        if(loginMethod!=null && loginMethod.trim().equalsIgnoreCase("standard")
-                && userName!=null && userName.trim().length()>0 && !pwee.contains(userName)){
-            customAlertView = LayoutInflater.from(this).inflate(R.layout.enrollment_dialog,null,false);
-            Button no = customAlertView.findViewById(R.id.supp2);
-            Button yes = customAlertView.findViewById(R.id.supp1);
-            AlertDialog d = materialDialogBuilder.setView(customAlertView).show();
-            no.setOnClickListener(v -> {
-                d.dismiss();
+        try {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_passkey);
+            sharedpreferences = getSharedPreferences(PasskeyActivity.PREFERENCES, Context.MODE_PRIVATE);
+            username = sharedpreferences.getString(PasskeyActivity.user, null);
+            TextView v = findViewById(R.id.toollangname1);
+            TextView vt = findViewById(R.id.vt);
+            passkeys = findViewById(R.id.idpasskeys);
+            passkey = (Button) findViewById(R.id.genpass);
+            v.setOnClickListener(v1 -> {
+                startActivity(new Intent(this, MainActivity.class));
             });
-            yes.setOnClickListener(v -> {
-                d.dismiss();
-                ringProgressDialog = ProgressDialog.show(this, "Please wait ...", "Enrolling ...", true);
-                ringProgressDialog.setCancelable(true);
-                ringProgressDialog.setIcon(R.drawable.ic_baseline_fingerprint_24);
-                Thread thread = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try  {
-                            enrollUserForPasswordless(userName);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+
+            materialDialogBuilder = new MaterialAlertDialogBuilder(this);
+            BottomNavigationView mBottomNavigationView = (BottomNavigationView) findViewById(R.id.bottomNavigationView);
+            mBottomNavigationView.getMenu().findItem(R.id.account).setChecked(true);
+            LinearLayoutManager linearLayoutManager = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
+            passkeys.setLayoutManager(linearLayoutManager);
+            passkeys.setAdapter(adapter);
+
+            Thread thread1 = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        populatePasskeys(username);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                adapter.notifyDataSetChanged();
+                            }
+                        });
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                });
-                thread.start();
+                }
             });
+            thread1.start();
+
+            passkey.setOnClickListener(v3 -> {
+                    ringProgressDialog = ProgressDialog.show(this, "Please wait ...", "Creating Passkey ...", true);
+                    ringProgressDialog.setCancelable(true);
+                    ringProgressDialog.setIcon(R.drawable.ic_baseline_fingerprint_24);
+                    Thread thread = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                enrollUserForPasswordless(username);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+                    thread.start();
+                });
+
+        }catch (Exception e){
+            e.printStackTrace();
         }
+
+    }
+
+    public void populatePasskeys(String username){
+        try {
+            vt = findViewById(R.id.vt);
+            String payload = HyprFIDO.getUserPasskeys(username);
+            JSONArray arr = new JSONArray(payload);
+            if(arr!=null && arr.length()>0) {
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject o = arr.getJSONObject(i);
+                    System.out.println(o.toString());
+                    list.add(new Passkey(o.getString("friendlyName"), "Created on " + new Date(Long.parseLong(o.getString("createDate"))).toString(), "Last used " + new Date(Long.parseLong(o.getString("lastUsedTime"))).toString(), o.getString("keyId")));
+                }
+
+            }else{
+                vt.setText("You have no passkeys registered");
+            }
+        }catch (Exception e){e.printStackTrace();
+
+        }
+
     }
 
     public void enrollUserForPasswordless(String userName){
@@ -167,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
 //                }
                // obj.put("excludeCredentials",arr);
                 System.out.println("FINAL PAYLOAD " + obj.toString());
-                CredentialManager credentialManager = CredentialManager.create(MainActivity.this);
+                CredentialManager credentialManager = CredentialManager.create(PasskeyActivity.this);
 
 //                JSONObject clientData = new JSONObject();
 //                clientData.put("type","webauthn.create");
@@ -185,7 +194,7 @@ public class MainActivity extends AppCompatActivity {
                 credentialManager.
                         createCredentialAsync(
                         createPublicKeyCredentialRequest,
-                        MainActivity.this,
+                        PasskeyActivity.this,
                         null,
                         getMainExecutor(),
                         new CredentialManagerCallback<CreateCredentialResponse, CreateCredentialException>() {
@@ -283,15 +292,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void handleSuccessfulEnrollment(CreateCredentialResponse result){
-
-        MainActivity.this.runOnUiThread(() -> {
+            populatePasskeys(username);
+            PasskeyActivity.this.runOnUiThread(() -> {
+                adapter.notifyDataSetChanged();
             ringProgressDialog.dismiss();
-            HashSet ex = (HashSet) sharedpreferences.getStringSet(pwe, new HashSet<String>());
-            ex.add(sharedpreferences.getString(user,""));
-            SharedPreferences.Editor editor = sharedpreferences.edit();
-            editor.putStringSet(MainActivity.pwe,ex);
-            editor.commit();
-            android.app.AlertDialog alertDialog = new android.app.AlertDialog.Builder(MainActivity.this).create();
+            android.app.AlertDialog alertDialog = new android.app.AlertDialog.Builder(PasskeyActivity.this).create();
             alertDialog.setTitle("Success");
             alertDialog.setIcon(R.drawable.ic_baseline_fingerprint_24);
             alertDialog.setMessage("You have successfully enrolled for passwordless login");
@@ -307,18 +312,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void handleEnrollmentError(Exception e){
-        MainActivity.this.runOnUiThread(() -> {
+        PasskeyActivity.this.runOnUiThread(() -> {
             ringProgressDialog.dismiss();
             e.printStackTrace();
             android.app.AlertDialog alertDialog = new android.app.AlertDialog.Builder(this).create();
             if (e.getMessage() != null && e.getMessage().contains("One of the excluded credentials exists on the local device")) {
                 alertDialog.setTitle("Success");
                 alertDialog.setIcon(R.drawable.ic_baseline_fingerprint_24);
-                alertDialog.setMessage("You have been setup for passwordless login");
+                alertDialog.setMessage("You already have a passkey on this device.");
                 HashSet ex = (HashSet) sharedpreferences.getStringSet(pwe, new HashSet<String>());
                 ex.add(sharedpreferences.getString(user, ""));
                 SharedPreferences.Editor editor = sharedpreferences.edit();
-                editor.putStringSet(MainActivity.pwe, ex);
+                editor.putStringSet(PasskeyActivity.pwe, ex);
                 editor.commit();
             } else {
                 alertDialog.setTitle("Error");
